@@ -2611,7 +2611,7 @@ function describeSource(entry) {
 /* Validates the target path, enforces the per-file size limit, and upserts into the store.
    The single place responsible for path safety and size limits so every staging path (repo
    mirror, data=, local add, replace) goes through the same checks. */
-function stageBytes(staged, relPath, bytes, source, sourceLabel, messages, maxBytes) {
+function stageBytes(staged, relPath, bytes, source, sourceLabel, messages, maxBytes, editorBaseline) {
   let full;
   try { full = vfsPathFor(relPath); }
   catch (err) { messages.push({ level: "error", text: err.message }); return; }
@@ -2622,6 +2622,7 @@ function stageBytes(staged, relPath, bytes, source, sourceLabel, messages, maxBy
   }
   const normalized = full.slice(CONFIG.VFS_PROJECT_DIR.length + 1);
   const entry = { path: normalized, name: basenameOf(normalized), size: bytes.byteLength, bytes, source, sourceLabel };
+  if (editorBaseline) entry.editorBaseline = editorBaseline;
   const result = staged.upsert(entry);
   if (result.applied && result.overwrote) {
     messages.push({ level: "info", text: "Using " + describeSource(entry) + "'s " + entry.name +
@@ -8480,7 +8481,8 @@ function duplicateWorkspaceFile(path) {
   } while (workspacePathExists(copyPath));
 
   const messages = [];
-  stageBytes(App.stagedStore, copyPath, file.bytes.slice(), "local", "duplicated in ShareR", messages, CONFIG.MAX_UPLOAD_FILE_BYTES);
+  // The copy retains its edits even if the source is restored.
+  stageBytes(App.stagedStore, copyPath, file.bytes.slice(), "local", "duplicated in ShareR", messages, CONFIG.MAX_UPLOAD_FILE_BYTES, file.editorBaseline);
   logStagingMessages(messages);
   setStatus("Created " + copyPath + ".");
 }
